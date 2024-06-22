@@ -42,6 +42,10 @@ async def custom_clone_key(key_to_clone: str, retry_count: int = 0) -> Optional[
 
         key_dispatcher.add_key(key["license"])
 
+        # Save the successful proxy
+        if proxy:
+            proxy_dispatcher.save_successful_proxy(proxy)
+
         return key, register_data, private_key
     except Exception as e:
         logger.error("{} (key: {}, retry count: {}, proxy: {})".format(

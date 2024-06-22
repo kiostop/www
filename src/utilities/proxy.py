@@ -2,16 +2,20 @@ from itertools import cycle
 import os
 from loguru import logger
 from config import config
+import random
+import asyncio
 
 
 class ProxyDispatcher:
     proxies: list[str] | None = None
 
-    def __init__(self, proxy_file: str | None) -> None:
+    def __init__(self, proxy_file: str | None, success_proxy_file: str | None) -> None:
+        self.proxy_file = proxy_file
+        self.success_proxy_file = success_proxy_file
+
         if proxy_file is None or proxy_file == '':
             return
 
-        self.proxy_file = proxy_file
         with open(proxy_file, 'r') as file:
             self.proxies = file.read().splitlines()
 
@@ -35,7 +39,15 @@ class ProxyDispatcher:
         except ValueError:
             pass  # Proxy not found, or already removed
 
-proxy_dispatcher = ProxyDispatcher(config.PROXY_FILE)
+    def save_successful_proxy(self, proxy: str) -> None:
+        if not self.success_proxy_file or proxy is None:
+            return
+
+        with open(self.success_proxy_file, 'a') as file:
+            file.write(proxy + "\n")
+
+
+proxy_dispatcher = ProxyDispatcher(config.PROXY_FILE, config.SUCCESS_PROXY_FILE)
 
 
 async def custom_clone_key(key_to_clone: str, retry_count: int = 0) -> tuple:
@@ -51,6 +63,10 @@ async def custom_clone_key(key_to_clone: str, retry_count: int = 0) -> tuple:
         )
 
         key_dispatcher.add_key(key["license"])
+
+        # Save the successful proxy
+        if proxy:
+            proxy_dispatcher.save_successful_proxy(proxy)
 
         return key, register_data, private_key
     except Exception as e:

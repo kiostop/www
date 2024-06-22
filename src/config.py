@@ -561,6 +561,7 @@ class Settings():
         ]
     THREADS_COUNT: int = 500
     PROXY_FILE: str | None = 'proxy.txt'
+    SUCCESS_PROXY_FILE: str | None = 'successful_proxies.txt'
     DEVICE_MODELS: list[str] = []
     SAVE_WIREGUARD_VARIABLES: bool = True
     DELAY: int = 25
