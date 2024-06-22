@@ -4,7 +4,7 @@ import random
 from typing import Optional, Tuple
 import aiohttp
 import json
-
+import sqlite3
 from loguru import logger
 
 from config import config
@@ -62,6 +62,24 @@ async def custom_clone_key(key_to_clone: str, retry_count: int = 0) -> Optional[
 async def worker(id: int, session: aiohttp.ClientSession) -> None:
     logger.debug("Worker {} started".format(id))
 
+    # Connect to SQLite database (create if it doesn't exist)
+    conn = sqlite3.connect('keys.db')
+    cursor = conn.cursor()
+
+    # Create table if it doesn't exist
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS keys (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key TEXT,
+        referral_count TEXT,
+        private_key TEXT,
+        peer_endpoint TEXT,
+        peer_public_key TEXT,
+        interface_addresses TEXT
+    )
+    ''')
+    conn.commit()
+
     while signal_handler.KEEP_PROCESSING:
         response = await custom_clone_key(
             key_to_clone=key_dispatcher.get_key(),
@@ -81,11 +99,21 @@ async def worker(id: int, session: aiohttp.ClientSession) -> None:
 
             logger.success(json.dumps(output))
 
-            async with session.post("https://warp-api2.bottg-c63.workers.dev/api/warp/savekey", json=output) as resp:
-                if resp.status == 200:
-                    logger.info(f"Successfully posted data for key: {key['license']}")
-                else:
-                    logger.error(f"Failed to post data for key: {key['license']}, status code: {resp.status}")
+            # Insert data into SQLite database
+            cursor.execute('''
+            INSERT INTO keys (key, referral_count, private_key, peer_endpoint, peer_public_key, interface_addresses)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ''', (
+                output["key"],
+                output["referral_count"],
+                output["private_key"],
+                output["peer_endpoint"],
+                output["peer_public_key"],
+                output["interface_addresses"]
+            ))
+            conn.commit()
+
+            logger.info(f"Successfully saved data for key: {key['license']}")
 
         if signal_handler.KEEP_PROCESSING and config.DELAY > 0:
             sleep_time = config.DELAY
@@ -93,6 +121,9 @@ async def worker(id: int, session: aiohttp.ClientSession) -> None:
             while sleep_time > 0 and signal_handler.KEEP_PROCESSING:
                 await asyncio.sleep(delay=1)
                 sleep_time -= 1
+
+    # Close the SQLite connection
+    conn.close()
 
 
 async def main() -> None:
