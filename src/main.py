@@ -32,10 +32,11 @@ async def custom_clone_key(key_to_clone: str, retry_count: int = 0) -> Optional[
     if retry_count > config.RETRY_COUNT or not signal_handler.KEEP_PROCESSING:
         return None
 
+    proxy = proxy_dispatcher.get_proxy()
     try:
         key, register_data, private_key = await clone_key(
             key=key_to_clone,
-            proxy_url=proxy_dispatcher.get_proxy(),
+            proxy_url=proxy,
             device_model=len(config.DEVICE_MODELS) > 0 and random.choice(config.DEVICE_MODELS) or None,
         )
 
@@ -43,11 +44,16 @@ async def custom_clone_key(key_to_clone: str, retry_count: int = 0) -> Optional[
 
         return key, register_data, private_key
     except Exception as e:
-        logger.error("{} (key: {}, retry count: {})".format(
+        logger.error("{} (key: {}, retry count: {}, proxy: {})".format(
             e,
             key_to_clone,
-            retry_count
+            retry_count,
+            proxy
         ))
+
+        # Remove the failed proxy from the pool and file
+        if proxy:
+            proxy_dispatcher.remove_proxy_from_file(proxy)
 
         if config.DELAY > 0 and signal_handler.KEEP_PROCESSING:
             sleep_time = config.DELAY
@@ -108,4 +114,5 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
+    logger.add("logfile.log", rotation="500 MB", level="DEBUG")  # Adjust log file and level as needed
     asyncio.run(main())

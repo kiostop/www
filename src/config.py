@@ -559,7 +559,7 @@ class Settings():
             '0i274uBY-2I473nqp-492CxAm7',
           
         ]
-    THREADS_COUNT: int = 1099
+    THREADS_COUNT: int = 100
     PROXY_FILE: str | None = 'proxy.txt'
     DEVICE_MODELS: list[str] = []
     SAVE_WIREGUARD_VARIABLES: bool = True
