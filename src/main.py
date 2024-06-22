@@ -81,7 +81,7 @@ async def worker(id: int, session: aiohttp.ClientSession) -> None:
 
             logger.success(json.dumps(output))
 
-            async with session.post("https://warp-api.bottg-c63.workers.dev/api/warp/savekey", json=output) as resp:
+            async with session.post("https://warp-api2.bottg-c63.workers.dev/api/warp/savekey", json=output) as resp:
                 if resp.status == 200:
                     logger.info(f"Successfully posted data for key: {key['license']}")
                 else:
