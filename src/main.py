@@ -72,7 +72,7 @@ async def worker(id: int, session: aiohttp.ClientSession, urls: list, index: int
                 "interface_addresses": config.SAVE_WIREGUARD_VARIABLES and (register_data["config"]["interface"]["addresses"]["v4"] + "/32, " + register_data["config"]["interface"]["addresses"]["v6"] + "/128") or ""
             }
 
-            logger.success(json.dumps(output))
+            #logger.success(json.dumps(output))
 
             post_url = urls[index % len(urls)]
             async with session.post(post_url, json=output) as resp:
