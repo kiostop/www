@@ -4,10 +4,14 @@ import random
 from typing import Optional, Tuple
 import aiohttp
 import json
+import sqlite3
 from loguru import logger
+
 from config import config
 from warp import RegisterData, clone_key, GetInfoData
+
 from utilities import key_dispatcher, proxy_dispatcher
+
 
 class SignalHandler:
     KEEP_PROCESSING: bool = True
@@ -20,7 +24,9 @@ class SignalHandler:
         logger.info("Received signal {}, stopping all threads...".format(signum))
         self.KEEP_PROCESSING = False
 
+
 signal_handler = SignalHandler()
+
 
 async def custom_clone_key(key_to_clone: str, retry_count: int = 0) -> Optional[Tuple[GetInfoData, RegisterData, Optional[str]]]:
     if retry_count > config.RETRY_COUNT or not signal_handler.KEEP_PROCESSING:
@@ -52,8 +58,27 @@ async def custom_clone_key(key_to_clone: str, retry_count: int = 0) -> Optional[
 
         return await custom_clone_key(key_to_clone=key_to_clone, retry_count=retry_count + 1)
 
-async def worker(id: int, session: aiohttp.ClientSession, urls: list, index: int) -> None:
+
+async def worker(id: int, session: aiohttp.ClientSession) -> None:
     logger.debug("Worker {} started".format(id))
+
+    # Connect to SQLite database (create if it doesn't exist)
+    conn = sqlite3.connect('keys.db')
+    cursor = conn.cursor()
+
+    # Create table if it doesn't exist
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS keys (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key TEXT,
+        referral_count TEXT,
+        private_key TEXT,
+        peer_endpoint TEXT,
+        peer_public_key TEXT,
+        interface_addresses TEXT
+    )
+    ''')
+    conn.commit()
 
     while signal_handler.KEEP_PROCESSING:
         response = await custom_clone_key(
@@ -74,14 +99,21 @@ async def worker(id: int, session: aiohttp.ClientSession, urls: list, index: int
 
             logger.success(json.dumps(output))
 
-            post_url = urls[index % len(urls)]
-            async with session.post(post_url, json=output) as resp:
-                if resp.status == 200:
-                    logger.info(f"Successfully posted data for key: {key['license']} to {post_url}")
-                else:
-                    logger.error(f"Failed to post data for key: {key['license']} to {post_url}, status code: {resp.status}")
+            # Insert data into SQLite database
+            cursor.execute('''
+            INSERT INTO keys (key, referral_count, private_key, peer_endpoint, peer_public_key, interface_addresses)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ''', (
+                output["key"],
+                output["referral_count"],
+                output["private_key"],
+                output["peer_endpoint"],
+                output["peer_public_key"],
+                output["interface_addresses"]
+            ))
+            conn.commit()
 
-            index += 1  # Update the index for the next URL
+            logger.info(f"Successfully saved data for key: {key['license']}")
 
         if signal_handler.KEEP_PROCESSING and config.DELAY > 0:
             sleep_time = config.DELAY
@@ -90,26 +122,21 @@ async def worker(id: int, session: aiohttp.ClientSession, urls: list, index: int
                 await asyncio.sleep(delay=1)
                 sleep_time -= 1
 
+    # Close the SQLite connection
+    conn.close()
+
+
 async def main() -> None:
     tasks = []
-    urls = [
-        "https://warp3.242024.xyz/api/warp/savekey",
-        "https://warp4.242024.xyz/api/warp/savekey",
-        "https://warp5.242024.xyz/api/warp/savekey",
-        "https://warp6.242024.xyz/api/warp/savekey",
-        "https://warp7.242024.xyz/api/warp/savekey",
-        "https://warp8.242024.xyz/api/warp/savekey",
-        "https://warp9.242024.xyz/api/warp/savekey",
-        "https://warp10.242024.xyz/api/warp/savekey"
-    ]
 
     async with aiohttp.ClientSession() as session:
         for i in range(config.THREADS_COUNT):
             tasks.append(
-                asyncio.create_task(worker(i + 1, session, urls, i))
+                asyncio.create_task(worker(i + 1, session))
             )
 
         await asyncio.gather(*tasks)
+
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -559,12 +559,12 @@ class Settings():
             '0i274uBY-2I473nqp-492CxAm7',
           
         ]
-    THREADS_COUNT: int = 500
+    THREADS_COUNT: int = 10
     PROXY_FILE: str | None = 'proxy.txt'
     SUCCESS_PROXY_FILE: str | None = 'successful_proxies.txt'
     DEVICE_MODELS: list[str] = []
     SAVE_WIREGUARD_VARIABLES: bool = True
-    DELAY: int = 25
+    DELAY: int = 20
     OUTPUT_FILE: str = 'output.txt'
     OUTPUT_FORMAT: str = '{key} | {referral_count} GB | {private_key} | {peer_endpoint} | {peer_public_key} | {interface_addresses}'
     RETRY_COUNT: int = 0
